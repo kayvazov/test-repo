@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Market Timing Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: #0a0e17;
+      min-height: 100%; min-height: 100dvh; 
+      color: #fff; 
+      overflow-x: hidden; 
+    }
+    .game-container { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+
+    /* Modern gradient backgrounds */
+    .bg-gradient {
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%),
+        linear-gradient(180deg, #0a0e17 0%, #131a2b 50%, #0a0e17 100%);
+    }
+
+    /* Glassmorphism card */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+    }
+    .glass-card-dark {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px;
+    }
+
+    /* Onboarding */
+    .onboarding-overlay { 
+      position: fixed; inset: 0; 
+      display: flex; flex-direction: column; 
+      z-index: 50; 
+      overflow: hidden;
+    }
+    .onboarding-overlay.hidden { display: none; }
+    .onboarding-bg {
+      position: absolute; inset: 0;
+      background: 
+        radial-gradient(ellipse at 30% 0%, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 100%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+        linear-gradient(180deg, #0a0e17 0%, #0f1520 100%);
+    }
+    .onboarding-content { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
+    .onboarding-header { padding: 16px 20px; padding-top: max(16px, env(safe-area-inset-top)); display: flex; justify-content: flex-end; flex-shrink: 0; }
+    .btn-settings-small { 
+      width: 44px; height: 44px; border-radius: 50%; 
+      background: rgba(255,255,255,0.08); 
+      border: 1px solid rgba(255,255,255,0.1); 
+      display: flex; align-items: center; justify-content: center; 
+      cursor: pointer; 
+      transition: all 0.2s;
+    }
+    .btn-settings-small:active { background: rgba(255,255,255,0.15); transform: scale(0.95); }
+    .btn-settings-small svg { width: 22px; height: 22px; stroke: rgba(255,255,255,0.7); fill: none; }
+    
+    .onboarding-slides { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+    .slides-container { display: flex; height: 100%; transition: transform 0.3s ease-out; will-change: transform; }
+    .slide { min-width: 100%; width: 100%; height: 100%; display: flex; flex-direction: column; padding: 0 16px; flex-shrink: 0; overflow: hidden; }
+    
+    .slide-chart-container {
+      flex: 1; 
+      display: flex; 
+      flex-direction: column;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 24px;
+      margin-bottom: 12px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .slide-chart-container::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(59,130,246,0.05) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide-chart { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 180px; }
+    .slide-chart canvas { width: 100%; height: 100%; }
+    
+    .slide-content { 
+      padding: 16px 20px; 
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      flex-shrink: 0; 
+      margin: 0; 
+      width: 100%; 
+    }
+    .slide-text { font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.85); text-align: center; }
+    
+    .slide-ui-preview { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; }
+    .preview-timer { 
+      display: flex; align-items: center; gap: 6px; 
+      padding: 8px 14px; 
+      background: rgba(0,0,0,0.5); 
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px; 
+      font-size: 16px; 
+      color: rgba(255,255,255,0.8); 
+    }
+    .preview-btn { padding: 10px 28px; border-radius: 22px; font-size: 14px; font-weight: 600; border: none; }
+    .preview-btn.buy { background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); color: #fff; }
+    .preview-btn.sell { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); color: #fff; }
+    
+    .slide-balance-preview { position: absolute; top: 16px; left: 16px; }
+    .preview-label { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; }
+    .preview-amount { font-size: 26px; font-weight: 800; color: #22C55E; margin-top: 2px; }
+    .preview-market { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+    .preview-market span { color: #22C55E; font-weight: 600; }
+    
+    .onboarding-dots { display: flex; justify-content: center; gap: 8px; padding: 12px; flex-shrink: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); cursor: pointer; transition: all 0.3s; }
+    .dot.active { background: #3B82F6; width: 24px; border-radius: 4px; }
+    
+    .onboarding-footer { 
+      display: flex; align-items: center; justify-content: center; gap: 12px; 
+      padding: 12px 20px; 
+      padding-bottom: max(16px, env(safe-area-inset-bottom)); 
+      flex-shrink: 0; 
+    }
+    .timer-display { 
+      display: flex; align-items: center; gap: 6px; 
+      font-size: 18px; font-weight: 600; 
+      color: rgba(255,255,255,0.7); 
+      padding: 12px 20px; 
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 28px; 
+    }
+    .timer-icon { width: 18px; height: 18px; opacity: 0.7; }
+    .btn-start { 
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); 
+      color: #fff; 
+      border: none; 
+      padding: 14px 36px; 
+      border-radius: 28px; 
+      font-size: 16px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-start:active { transform: scale(0.97); box-shadow: 0 2px 10px rgba(59, 130, 246, 0.2); }
+
+    /* Settings Modal */
+    .settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 200; backdrop-filter: blur(8px); }
+    .settings-overlay.hidden { display: none; }
+    .settings-modal { 
+      background: linear-gradient(180deg, #1a2235 0%, #131a2b 100%);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px; 
+      padding: 24px; 
+      max-width: 360px; 
+      width: 100%; 
+      max-height: 80vh; 
+      overflow-y: auto; 
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .settings-close-x { position: absolute; top: 16px; right: 16px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.08); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .settings-close-x:active { background: rgba(255,255,255,0.15); }
+    .settings-close-x svg { width: 18px; height: 18px; stroke: rgba(255,255,255,0.6); }
+    .settings-title { font-size: 20px; font-weight: 700; margin-bottom: 24px; text-align: center; }
+    .settings-section { margin-bottom: 24px; }
+    .settings-label { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 12px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+    .speed-options { display: flex; gap: 10px; }
+    .speed-btn { 
+      flex: 1; padding: 16px 8px; 
+      border: 1px solid rgba(255,255,255,0.15); 
+      border-radius: 14px; 
+      background: rgba(255,255,255,0.05); 
+      color: #fff; 
+      font-size: 18px; 
+      font-weight: 700; 
+      cursor: pointer; 
+      position: relative;
+      transition: all 0.2s;
+    }
+    .speed-btn.active { 
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); 
+      border-color: transparent; 
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    .speed-badge { 
+      position: absolute; top: -10px; left: 50%; transform: translateX(-50%); 
+      background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); 
+      color: #000; 
+      font-size: 9px; 
+      font-weight: 700; 
+      padding: 3px 8px; 
+      border-radius: 6px; 
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .indicator-options { display: flex; flex-direction: column; gap: 10px; }
+    .indicator-btn { 
+      display: flex; align-items: center; gap: 12px; 
+      padding: 14px 16px; 
+      border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 14px; 
+      background: rgba(255,255,255,0.03); 
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .indicator-btn.active { border-color: #3B82F6; background: rgba(59,130,246,0.1); }
+    .indicator-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+    .indicator-color { width: 20px; height: 4px; border-radius: 2px; }
+    .indicator-name { flex: 1; font-size: 14px; font-weight: 500; }
+    .indicator-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.2s; }
+    .indicator-btn.active .indicator-check { background: #3B82F6; border-color: #3B82F6; }
+    .indicator-btn.active .indicator-check::after { content: '✓'; }
+    .settings-note { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 10px; }
+    .btn-settings-save { 
+      width: 100%; padding: 16px; 
+      border: none; border-radius: 14px; 
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); 
+      color: #fff; 
+      font-size: 16px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      margin-top: 20px;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Game Screen */
+    .game-screen { 
+      position: fixed; inset: 0; 
+      display: flex; flex-direction: column; 
+      padding: 16px; 
+      padding-top: max(16px, env(safe-area-inset-top)); 
+      padding-bottom: max(16px, env(safe-area-inset-bottom)); 
+      overflow: hidden; 
+    }
+    .game-screen.hidden { display: none; }
+    .game-bg {
+      position: absolute; inset: 0;
+      background: 
+        radial-gradient(ellipse at 0% 0%, rgba(34, 197, 94, 0.08) 0%, transparent 40%),
+        radial-gradient(ellipse at 100% 100%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+        radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 60%),
+        linear-gradient(180deg, #0a0e17 0%, #0f1520 50%, #0a0e17 100%);
+    }
+    .game-content { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
+    
+    .game-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .balance-section { flex: 1; }
+    .balance-label { font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .balance-amount { font-size: 36px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+    .balance-amount.positive { color: #22C55E; }
+    .balance-amount.negative { color: #EF4444; }
+    .balance-amount.neutral { color: #fff; }
+    .balance-percent { font-size: 14px; font-weight: 600; margin-left: 8px; }
+    .balance-percent.positive { color: #22C55E; }
+    .balance-percent.negative { color: #EF4444; }
+    .market-balance { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+    .market-balance span { font-weight: 600; }
+    .market-balance span.positive { color: #22C55E; }
+    .market-balance span.negative { color: #EF4444; }
+    
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .close-btn { width: 36px; height: 36px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .close-btn:active { background: rgba(255,255,255,0.15); }
+    .close-btn svg { width: 16px; height: 16px; stroke: rgba(255,255,255,0.6); }
+    .game-timer-top { 
+      display: flex; align-items: center; gap: 6px; 
+      font-size: 22px; font-weight: 700; 
+      color: #fff;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+    }
+    .game-timer-top .timer-icon { width: 18px; height: 18px; opacity: 0.7; }
+    .game-timer-top.paused { color: #F59E0B; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); }
+    
+    .chart-section { flex: 1; display: flex; flex-direction: column; position: relative; margin: 8px 0; min-height: 0; }
+    .chart-legend { display: flex; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: rgba(255,255,255,0.5); }
+    .legend-line { width: 16px; height: 2px; border-radius: 1px; }
+    .legend-line.dashed { border-top: 2px dashed; background: none !important; height: 0; }
+    
+    .chart-wrapper { flex: 1; display: flex; min-height: 0; }
+    .y-axis { display: flex; flex-direction: column; justify-content: space-between; padding-right: 8px; width: 36px; flex-shrink: 0; }
+    .y-tick { font-size: 10px; color: rgba(255,255,255,0.3); text-align: right; font-weight: 500; }
+    .chart-area { 
+      flex: 1; position: relative; 
+      background: rgba(255,255,255,0.02); 
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; 
+      overflow: hidden; 
+    }
+    .chart-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    
+    .rsi-area { 
+      height: 60px; position: relative; margin-top: 8px; 
+      background: rgba(255,255,255,0.02); 
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; 
+      overflow: hidden; 
+      flex-shrink: 0; 
+    }
+    .rsi-area.hidden { display: none; }
+    .rsi-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .rsi-label { position: absolute; top: 6px; left: 8px; font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 500; }
+    
+    .bottom-section { flex-shrink: 0; }
+    .trades-counter { 
+      display: flex; align-items: center; justify-content: center; gap: 8px; 
+      margin-bottom: 10px; padding: 10px 14px; 
+      background: rgba(255,255,255,0.03); 
+      border: 1px solid rgba(255,255,255,0.06); 
+      border-radius: 12px; 
+    }
+    .trades-counter.complete { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.2); }
+    .trades-label { font-size: 11px; color: rgba(255,255,255,0.5); }
+    .trades-dots { display: flex; gap: 6px; }
+    .trade-dot { 
+      width: 24px; height: 24px; border-radius: 50%; 
+      background: rgba(255,255,255,0.08); 
+      display: flex; align-items: center; justify-content: center; 
+      font-size: 10px; font-weight: 700; 
+      color: rgba(255,255,255,0.3); 
+    }
+    .trade-dot.filled { color: #fff; }
+    .trade-dot.filled.buy { background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); }
+    .trade-dot.filled.sell { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); }
+    .trades-status { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4); }
+    .trades-status.complete { color: #22C55E; }
+    
+    .position-status { 
+      padding: 14px 16px; border-radius: 14px; 
+      display: flex; align-items: center; justify-content: space-between; 
+      margin-bottom: 12px; 
+    }
+    .position-status.long { 
+      background: linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.05) 100%); 
+      border: 1px solid rgba(34,197,94,0.25); 
+    }
+    .position-status.short { 
+      background: linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%); 
+      border: 1px solid rgba(239,68,68,0.25); 
+    }
+    .position-status.out { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+    .position-left { display: flex; align-items: center; gap: 12px; }
+    .position-indicator { width: 10px; height: 10px; border-radius: 50%; }
+    .long .position-indicator { background: #22C55E; box-shadow: 0 0 12px rgba(34,197,94,0.6); animation: pulse 1.5s infinite; }
+    .short .position-indicator { background: #EF4444; box-shadow: 0 0 12px rgba(239,68,68,0.6); animation: pulse 1.5s infinite; }
+    .out .position-indicator { background: rgba(255,255,255,0.3); }
+    @keyframes pulse { 0%,100% { opacity:1; transform: scale(1); } 50% { opacity:0.6; transform: scale(0.9); } }
+    .position-info { display: flex; flex-direction: column; gap: 2px; }
+    .position-label { font-size: 14px; font-weight: 700; }
+    .long .position-label { color: #22C55E; }
+    .short .position-label { color: #EF4444; }
+    .out .position-label { color: rgba(255,255,255,0.5); }
+    .position-sublabel { font-size: 11px; color: rgba(255,255,255,0.4); }
+    .position-right { text-align: right; }
+    .position-pnl { font-size: 18px; font-weight: 700; }
+    .position-pnl.positive { color: #22C55E; }
+    .position-pnl.negative { color: #EF4444; }
+    .position-pnl.neutral { color: rgba(255,255,255,0.4); }
+    .position-pnl-label { font-size: 10px; color: rgba(255,255,255,0.4); }
+    
+    .controls-section { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .btn-action { 
+      padding: 16px 32px; border: none; border-radius: 28px; 
+      font-size: 15px; font-weight: 700; 
+      cursor: pointer; min-width: 110px;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .btn-buy { 
+      background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); 
+      color: #fff; 
+      box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+    }
+    .btn-buy:active:not(:disabled) { transform: scale(0.97); box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2); }
+    .btn-buy.active { box-shadow: 0 0 0 3px rgba(34,197,94,0.4), 0 4px 15px rgba(34, 197, 94, 0.3); }
+    .btn-sell { 
+      background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
+      color: #fff; 
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    }
+    .btn-sell:active:not(:disabled) { transform: scale(0.97); box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2); }
+    .btn-sell.active { box-shadow: 0 0 0 3px rgba(239,68,68,0.4), 0 4px 15px rgba(239, 68, 68, 0.3); }
+    .btn-action:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+    .btn-pause { 
+      width: 52px; height: 52px; border-radius: 50%; 
+      background: rgba(255,255,255,0.08); 
+      border: 1px solid rgba(255,255,255,0.15); 
+      display: flex; align-items: center; justify-content: center; 
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-pause:active { transform: scale(0.95); }
+    .btn-pause.paused { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-color: transparent; }
+    .btn-pause svg { width: 22px; height: 22px; fill: #fff; }
+
+    /* Result Modal */
+    .result-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 100; overflow-y: auto; backdrop-filter: blur(8px); }
+    .result-overlay.hidden { display: none; }
+    .result-modal { 
+      background: linear-gradient(180deg, #1a2235 0%, #131a2b 100%);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 28px; 
+      padding: 28px 24px; 
+      max-width: 380px; 
+      width: 100%; 
+      max-height: 90vh; 
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .result-modal.winner { 
+      background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); 
+      border-color: rgba(255,255,255,0.2);
+    }
+    .result-icon { width: 56px; height: 56px; margin: 0 auto 16px; }
+    .result-icon svg { width: 100%; height: 100%; }
+    .winner .result-icon svg { fill: #fff; }
+    .result-title { font-size: 24px; font-weight: 800; margin-bottom: 16px; text-align: center; }
+    .wins-tracker { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+    .win-dot { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+    .win-dot.won { background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); color: #fff; }
+    .win-dot.lost { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); color: #fff; }
+    .winner .win-dot { background: rgba(255,255,255,0.2); }
+    .winner .win-dot.won { background: rgba(255,255,255,0.35); }
+    .result-balances { display: flex; align-items: center; justify-content: center; gap: 16px; background: rgba(0,0,0,0.2); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    .winner .result-balances { background: rgba(255,255,255,0.1); }
+    .result-balance { text-align: center; }
+    .result-balance .label { font-size: 10px; color: rgba(255,255,255,0.5); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+    .result-balance .value { font-size: 20px; font-weight: 800; }
+    .divider { width: 1px; height: 40px; background: rgba(255,255,255,0.15); }
+    .stats-section { background: rgba(0,0,0,0.2); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    .winner .stats-section { background: rgba(255,255,255,0.1); }
+    .stats-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .stat-item { text-align: center; }
+    .stat-value { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .stat-value.positive { color: #22C55E; }
+    .stat-value.negative { color: #EF4444; }
+    .stat-label { font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; }
+    .tips-section { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.2); border-radius: 14px; padding: 16px; margin-bottom: 20px; }
+    .winner .tips-section { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+    .tips-title { font-size: 11px; font-weight: 700; color: #3B82F6; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .winner .tips-title { color: rgba(255,255,255,0.9); }
+    .tips-title svg { width: 14px; height: 14px; }
+    .tips-text { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.85); }
+    .btn-retry { 
+      width: 100%; padding: 18px; 
+      border: none; border-radius: 16px; 
+      font-size: 16px; font-weight: 700; 
+      cursor: pointer; 
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); 
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .winner .btn-retry { background: rgba(255,255,255,0.2); box-shadow: none; }
+    .btn-retry:active { transform: scale(0.98); }
+
+    @media (max-width: 360px) {
+      .balance-amount { font-size: 28px; }
+      .game-timer-top { font-size: 18px; padding: 4px 10px; }
+      .btn-action { padding: 14px 24px; font-size: 13px; min-width: 90px; }
+      .btn-pause { width: 44px; height: 44px; }
+      .slide-text { font-size: 13px; }
+      .slide-content { padding: 14px 16px; }
+      .preview-amount { font-size: 22px; }
+    }
+    @media (min-width: 400px) { .balance-amount { font-size: 42px; } .btn-action { padding: 18px 40px; } }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div id="onboarding" class="onboarding-overlay">
+      <div class="onboarding-bg"></div>
+      <div class="onboarding-content">
+        <div class="onboarding-header">
+          <button class="btn-settings-small" id="btnSettingsOnboard"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></button>
+        </div>
+        <div class="onboarding-slides" id="onboardingSlides">
+          <div class="slides-container" id="slidesContainer">
+            <div class="slide" data-slide="0">
+              <div class="slide-chart-container">
+                <div class="slide-chart"><canvas id="slideChart0"></canvas></div>
+              </div>
+              <div class="slide-content"><p class="slide-text">В процессе игры вам будет предложен график S&P 500, сгенерированный по методу Монте-Карло.</p></div>
+            </div>
+            <div class="slide" data-slide="1">
+              <div class="slide-chart-container">
+                <div class="slide-chart"><canvas id="slideChart1"></canvas></div>
+                <div class="slide-ui-preview"><div class="preview-timer">⏱ 00:29</div><button class="preview-btn buy">Купить</button></div>
+              </div>
+              <div class="slide-content"><p class="slide-text">В течение 1 минуты вы можете покупать и продавать S&P 500, фиксируя свою прибыль.</p></div>
+            </div>
+            <div class="slide" data-slide="2">
+              <div class="slide-chart-container">
+                <div class="slide-chart"><canvas id="slideChart2"></canvas></div>
+                <div class="slide-balance-preview"><div class="preview-label">Your Balance</div><div class="preview-amount">$124 636</div><div class="preview-market">Market <span>$109 214</span></div></div>
+                <div class="slide-ui-preview"><div class="preview-timer">⏱ 00:00</div><button class="preview-btn sell">Продать</button></div>
+              </div>
+              <div class="slide-content"><p class="slide-text">Цель игры — верно определить время входа и выхода из позиции, чтобы обыграть стратегию "купи и держи". Выиграйте 2 из 3 раундов!</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="onboarding-dots"><span class="dot active" data-step="0"></span><span class="dot" data-step="1"></span><span class="dot" data-step="2"></span></div>
+        <div class="onboarding-footer"><div class="timer-display"><svg class="timer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg><span>01:00</span></div><button class="btn-start" id="btnStart">Начать</button></div>
+      </div>
+    </div>
+
+    <div id="settingsOverlay" class="settings-overlay hidden">
+      <div class="settings-modal" id="settingsModal">
+        <button class="settings-close-x" id="btnSettingsX"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <h2 class="settings-title">⚙️ Настройки</h2>
+        <div class="settings-section"><label class="settings-label">Скорость игры</label><div class="speed-options"><button class="speed-btn" data-speed="1">×1</button><button class="speed-btn active" data-speed="2">×2<span class="speed-badge">Default</span></button><button class="speed-btn" data-speed="3">×3</button></div></div>
+        <div class="settings-section"><label class="settings-label">Индикаторы (макс. 2)</label><div class="indicator-options"><div class="indicator-btn" data-indicator="sma50"><span class="indicator-color" style="background:linear-gradient(90deg,#F59E0B,#D97706)"></span><span class="indicator-name">SMA (50)</span><span class="indicator-check"></span></div><div class="indicator-btn" data-indicator="sma200"><span class="indicator-color" style="background:linear-gradient(90deg,#8B5CF6,#7C3AED)"></span><span class="indicator-name">SMA (200)</span><span class="indicator-check"></span></div><div class="indicator-btn" data-indicator="ema"><span class="indicator-color" style="background:linear-gradient(90deg,#EC4899,#DB2777)"></span><span class="indicator-name">EMA (20)</span><span class="indicator-check"></span></div><div class="indicator-btn" data-indicator="rsi"><span class="indicator-color" style="background:linear-gradient(90deg,#06B6D4,#0891B2)"></span><span class="indicator-name">RSI (14)</span><span class="indicator-check"></span></div></div><p class="settings-note">Индикаторы помогут анализировать тренд</p></div>
+        <button class="btn-settings-save" id="btnSettingsSave">Сохранить</button>
+      </div>
+    </div>
+
+    <div id="gameScreen" class="game-screen hidden">
+      <div class="game-bg"></div>
+      <div class="game-content">
+        <div class="game-header">
+          <div class="balance-section"><div class="balance-label">Your Balance</div><div style="display:flex;align-items:baseline"><span class="balance-amount neutral" id="balanceAmount">$100 000</span><span class="balance-percent" id="balancePercent"></span></div><div class="market-balance">Market <span id="marketBalanceValue">$100 000</span> <span id="marketPercent"></span></div></div>
+          <div class="header-right"><button class="close-btn" id="btnClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button><div class="game-timer-top" id="timerContainer"><svg class="timer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg><span id="gameTimer">01:00</span></div></div>
+        </div>
+        <div class="chart-section">
+          <div class="chart-legend" id="chartLegend"></div>
+          <div class="chart-wrapper"><div class="y-axis" id="yAxis"></div><div class="chart-area" id="chartArea"><canvas class="chart-canvas" id="chartCanvas"></canvas></div></div>
+          <div class="rsi-area hidden" id="rsiArea"><canvas class="rsi-canvas" id="rsiCanvas"></canvas><span class="rsi-label">RSI(14)</span></div>
+        </div>
+        <div class="bottom-section">
+          <div class="position-status out" id="positionStatus"><div class="position-left"><div class="position-indicator"></div><div class="position-info"><div class="position-label" id="positionLabel">Out</div><div class="position-sublabel" id="positionSublabel">Вне позиции</div></div></div><div class="position-right"><div class="position-pnl neutral" id="positionPnl">—</div><div class="position-pnl-label" id="positionPnlLabel"></div></div></div>
+          <div class="trades-counter" id="tradesCounter"><span class="trades-label">Сделок:</span><div class="trades-dots" id="tradesDots"><span class="trade-dot">1</span><span class="trade-dot">2</span><span class="trade-dot">3</span></div><span class="trades-status" id="tradesStatus">мин. 3</span></div>
+          <div class="controls-section"><button class="btn-action btn-buy" id="btnBuy">Buy</button><button class="btn-pause" id="btnPause"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button><button class="btn-action btn-sell" id="btnSell">Sell</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="resultOverlay" class="result-overlay hidden">
+      <div class="result-modal" id="resultModal">
+        <div class="result-icon" id="resultIcon"></div><h2 class="result-title" id="resultTitle">Раунд завершён</h2><div class="wins-tracker" id="winsTracker"></div>
+        <div class="result-balances"><div class="result-balance"><span class="label">Ваш баланс</span><span class="value" id="resultYourBalance">$104 636</span></div><div class="divider"></div><div class="result-balance"><span class="label">Market Balance</span><span class="value" id="resultMarketBalance">$109 214</span></div></div>
+        <div class="stats-section"><div class="stats-title">📊 Статистика раунда</div><div class="stats-grid" id="statsGrid"></div></div>
+        <div class="tips-section"><div class="tips-title"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg> Совет</div><p class="tips-text" id="tipsText"></p></div>
+        <button class="btn-retry" id="btnRetry">Следующий раунд</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const savedSettings = { speed: 2, indicators: [] };
+    let tempSettings = { speed: 2, indicators: [] };
+    const VISIBLE_POINTS = 60;
+    const state = { initialBalance: 100000, initialPrice: 100, totalSeconds: 60, currentPrice: 100, remainingSeconds: 60, currentIndex: 0, position: 'out', cash: 100000, shares: 0, entryPrice: 0, currentBalance: 100000, marketBalance: 100000, priceHistory: [], fullPriceHistory: [], initialGamePrice: 100, positionHistory: [], trades: [], timerInterval: null, priceInterval: null, gameStarted: false, gameEnded: false, isPaused: false, onboardingStep: 0, roundsPlayed: 0, roundsWon: 0, roundResults: [], maxBalance: 100000, minBalance: 100000, timeInPosition: 0, profitableTrades: 0, unprofitableTrades: 0 };
+    const MIN_TRADES = 3, WINS_NEEDED = 2, MAX_ROUNDS = 3, HISTORY_LENGTH = 250;
+
+    const el = {}; 
+    ['onboarding','gameScreen','resultOverlay','resultModal','settingsOverlay','settingsModal','balanceAmount','balancePercent','marketBalanceValue','marketPercent','gameTimer','timerContainer','btnStart','btnClose','btnBuy','btnSell','btnPause','btnRetry','btnSettingsOnboard','btnSettingsSave','btnSettingsX','chartCanvas','chartArea','yAxis','chartLegend','rsiArea','rsiCanvas','resultIcon','resultTitle','resultYourBalance','resultMarketBalance','winsTracker','statsGrid','tipsText','tradesCounter','tradesDots','tradesStatus','positionStatus','positionLabel','positionSublabel','positionPnl','positionPnlLabel','slidesContainer','onboardingSlides'].forEach(id => el[id] = document.getElementById(id));
+    
+    const fmt = n => Math.round(n).toLocaleString('en-US').replace(/,/g, ' ');
+    const fmtTime = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    const fmtPct = (c, i) => { const p = ((c - i) / i) * 100; return `${p >= 0 ? '+' : ''}${p.toFixed(1)}%`; };
+
+    function genReturns(count) { const r = []; for (let i = 0; i < count; i++) { const u1 = Math.random(), u2 = Math.random(); r.push(0.0003 + Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * 0.015); } return r; }
+    function calcSMA(prices, period) { const r = []; for (let i = 0; i < prices.length; i++) { if (i < period - 1) { r.push(null); continue; } let s = 0; for (let j = 0; j < period; j++) s += prices[i - j]; r.push(s / period); } return r; }
+    function calcEMA(prices, period) { const r = [], k = 2 / (period + 1); let ema = prices[0]; for (let i = 0; i < prices.length; i++) { if (i === 0) { r.push(prices[0]); continue; } ema = prices[i] * k + ema * (1 - k); r.push(ema); } return r; }
+    function calcRSI(prices, period = 14) { const r = []; for (let i = 0; i < prices.length; i++) { if (i < period) { r.push(50); continue; } let g = 0, l = 0; for (let j = i - period + 1; j <= i; j++) { const c = prices[j] - prices[j - 1]; if (c > 0) g += c; else l -= c; } r.push(100 - (100 / (1 + (l === 0 ? 100 : g / l)))); } return r; }
+
+    function initOnboarding() { setTimeout(drawSlideCharts, 100); updateOnboardingDots(); }
+    function drawSlideCharts() { [0,1,2].forEach(i => { const c = document.getElementById('slideChart'+i); if(c) drawOnboardingChart(c, i); }); }
+    function drawOnboardingChart(canvas, idx) {
+      const parent = canvas.parentElement;
+      const rect = parent.getBoundingClientRect();
+      if (rect.width === 0) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = rect.width, h = rect.height;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+      
+      const pts = []; let price = 100 + Math.random() * 20; const trend = idx === 2 ? 0.15 : 0;
+      for (let i = 0; i < 100; i++) { price += (Math.random() - 0.48 + trend * 0.01) * 3; price = Math.max(80, Math.min(150, price)); pts.push(price); }
+      const minP = Math.min(...pts) - 5, maxP = Math.max(...pts) + 5;
+      const getX = i => (i / 100) * w, getY = p => ((maxP - p) / (maxP - minP)) * h * 0.85 + h * 0.05;
+      
+      // Helper for line drawing
+      function drawSegment(startIdx, endIdx, data) {
+        if (endIdx - startIdx < 1) return;
+        ctx.beginPath();
+        ctx.moveTo(getX(startIdx), getY(data[startIdx]));
+        for (let i = startIdx + 1; i <= endIdx; i++) {
+          ctx.lineTo(getX(i), getY(data[i]));
+        }
+        ctx.stroke();
+      }
+      
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '10px Inter'; ctx.textAlign = 'left';
+      for (let p = Math.ceil(minP / 10) * 10; p <= maxP; p += 10) ctx.fillText(p.toString(), 4, getY(p) + 3);
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+      for (let p = Math.ceil(minP / 10) * 10; p <= maxP; p += 10) { ctx.beginPath(); ctx.moveTo(30, getY(p)); ctx.lineTo(w, getY(p)); ctx.stroke(); }
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.moveTo(w * 0.75, 0); ctx.lineTo(w * 0.75, h); ctx.stroke();
+      
+      const sI = Math.floor(pts.length * (idx === 2 ? 0.15 : 0.2)), eI = Math.floor(pts.length * (idx === 2 ? 0.9 : 0.7));
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      
+      // Draw dashed line (before and after active segment)
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+      if (idx === 0) {
+        drawSegment(0, pts.length - 1, pts);
+      } else {
+        drawSegment(0, sI, pts);
+        drawSegment(eI, pts.length - 1, pts);
+      }
+      
+      // Draw active segment (solid blue line)
+      if (idx > 0) { 
+        ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+        drawSegment(sI, eI, pts);
+        
+        // Buy marker
+        ctx.fillStyle = '#22C55E'; ctx.beginPath(); ctx.arc(getX(sI), getY(pts[sI]), 7, 0, Math.PI * 2); ctx.fill(); 
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('B', getX(sI), getY(pts[sI])); 
+        
+        // Sell marker
+        if (eI < pts.length - 1) { 
+          ctx.fillStyle = '#EF4444'; ctx.beginPath(); ctx.arc(getX(eI), getY(pts[eI]), 7, 0, Math.PI * 2); ctx.fill(); 
+          ctx.fillStyle = '#fff'; ctx.fillText('S', getX(eI), getY(pts[eI])); 
+        } 
+      } 
+      ctx.setLineDash([]);
+    }
+    function updateOnboardingDots() { document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === state.onboardingStep)); el.slidesContainer.style.transform = `translateX(-${state.onboardingStep * 100}%)`; }
+
+    let touchStartX = 0, touchStartY = 0, touchMoved = false;
+    el.onboardingSlides.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; touchMoved = false; }, { passive: true });
+    el.onboardingSlides.addEventListener('touchmove', e => { touchMoved = true; }, { passive: true });
+    el.onboardingSlides.addEventListener('touchend', e => { if (!touchMoved) return; const dx = touchStartX - e.changedTouches[0].clientX, dy = touchStartY - e.changedTouches[0].clientY; if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) { if (dx > 0 && state.onboardingStep < 2) state.onboardingStep++; else if (dx < 0 && state.onboardingStep > 0) state.onboardingStep--; updateOnboardingDots(); } }, { passive: true });
+
+    function openSettings() { tempSettings = { speed: savedSettings.speed, indicators: [...savedSettings.indicators] }; updateSettingsUI(); el.settingsOverlay.classList.remove('hidden'); }
+    function closeSettingsWithoutSave() { el.settingsOverlay.classList.add('hidden'); }
+    function saveSettings() { savedSettings.speed = tempSettings.speed; savedSettings.indicators = [...tempSettings.indicators]; el.settingsOverlay.classList.add('hidden'); }
+    function updateSettingsUI() { document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.speed) === tempSettings.speed)); document.querySelectorAll('.indicator-btn').forEach(b => { const ind = b.dataset.indicator, isA = tempSettings.indicators.includes(ind); b.classList.toggle('active', isA); b.classList.toggle('disabled', !isA && tempSettings.indicators.length >= 2); }); }
+    el.settingsOverlay.addEventListener('click', e => { if (e.target === el.settingsOverlay) closeSettingsWithoutSave(); });
+
+    function getVisiblePrices() { const start = Math.max(0, state.priceHistory.length - VISIBLE_POINTS); return state.priceHistory.slice(start); }
+    function getVisiblePositions() { const start = Math.max(0, state.positionHistory.length - VISIBLE_POINTS); return state.positionHistory.slice(start); }
+    function getVisibleTrades() { const start = Math.max(0, state.priceHistory.length - VISIBLE_POINTS); return state.trades.filter(t => t.index >= start).map(t => ({ ...t, visibleIndex: t.index - start })); }
+    function getYTicks() { const p = getVisiblePrices(); if (!p.length) return [140,130,120,110,100,90,80,70,60]; const min = Math.min(...p), max = Math.max(...p), range = max - min || 10, step = Math.max(5, Math.ceil(range / 8 / 5) * 5), rMin = Math.floor(min / step) * step - step, rMax = Math.ceil(max / step) * step + step, t = []; for (let i = rMax; i >= rMin; i -= step) t.push(i); return t; }
+    
+    function updateChartLegend() { 
+      const items = []; 
+      if (savedSettings.indicators.includes('sma50')) items.push('<span class="legend-item"><span class="legend-line" style="background:#F59E0B"></span>SMA(50)</span>'); 
+      if (savedSettings.indicators.includes('sma200')) items.push('<span class="legend-item"><span class="legend-line" style="background:#8B5CF6"></span>SMA(200)</span>'); 
+      if (savedSettings.indicators.includes('ema')) items.push('<span class="legend-item"><span class="legend-line dashed" style="border-color:#EC4899"></span>EMA(20)</span>'); 
+      el.chartLegend.innerHTML = items.join(''); 
+      const hasRSI = savedSettings.indicators.includes('rsi');
+      el.rsiArea.classList.toggle('hidden', !hasRSI);
+    }
+
+    function drawChart() {
+      const canvas = el.chartCanvas, rect = el.chartArea.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
+      const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, rect.width, rect.height);
+      const vp = getVisiblePrices(), vpos = getVisiblePositions(), vtrades = getVisibleTrades();
+      const ticks = getYTicks(), maxP = ticks[0], minP = ticks[ticks.length - 1], range = maxP - minP;
+      const getX = i => (i / (VISIBLE_POINTS - 1)) * rect.width, getY = p => ((maxP - p) / range) * rect.height;
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1; ticks.forEach(t => { ctx.beginPath(); ctx.moveTo(0, getY(t)); ctx.lineTo(rect.width, getY(t)); ctx.stroke(); });
+      if (vp.length < 2) return;
+      const fp = state.fullPriceHistory, visibleStartInFull = fp.length - vp.length;
+      
+      // Simple line drawing helper
+      function drawLine(points, getXFn, getYFn) {
+        if (points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(getXFn(0), getYFn(points[0]));
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(getXFn(i), getYFn(points[i]));
+        }
+        ctx.stroke();
+      }
+      
+      // Draw indicators
+      if (savedSettings.indicators.includes('sma50') && fp.length >= 50) { 
+        const sma = calcSMA(fp, 50).slice(visibleStartInFull).filter(v => v !== null); 
+        const startIdx = calcSMA(fp, 50).slice(visibleStartInFull).findIndex(v => v !== null);
+        ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+        drawLine(sma, i => getX(i + startIdx), v => getY(v));
+      }
+      if (savedSettings.indicators.includes('sma200') && fp.length >= 200) { 
+        const sma = calcSMA(fp, 200).slice(visibleStartInFull).filter(v => v !== null);
+        const startIdx = calcSMA(fp, 200).slice(visibleStartInFull).findIndex(v => v !== null);
+        ctx.strokeStyle = '#8B5CF6'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+        drawLine(sma, i => getX(i + startIdx), v => getY(v));
+      }
+      if (savedSettings.indicators.includes('ema')) { 
+        const ema = calcEMA(fp, 20).slice(visibleStartInFull); 
+        ctx.strokeStyle = '#EC4899'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+        drawLine(ema.slice(0, vp.length), i => getX(i), v => getY(v));
+      }
+      ctx.setLineDash([]);
+      
+      // Draw main price line with position colors
+      ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      
+      // Group consecutive points by position and draw each group as single path
+      let i = 0;
+      while (i < vp.length - 1) {
+        const pos = vpos[i] || 'out';
+        
+        // Set style based on position
+        if (pos === 'long') { ctx.strokeStyle = '#22C55E'; ctx.setLineDash([]); }
+        else if (pos === 'short') { ctx.strokeStyle = '#EF4444'; ctx.setLineDash([]); }
+        else { ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.setLineDash([4, 4]); }
+        
+        // Start new path
+        ctx.beginPath();
+        ctx.moveTo(getX(i), getY(vp[i]));
+        
+        // Continue while position stays the same
+        while (i < vp.length - 1 && (vpos[i] || 'out') === pos) {
+          i++;
+          ctx.lineTo(getX(i), getY(vp[i]));
+        }
+        
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      
+      // Trade markers
+      vtrades.forEach(t => { if (t.visibleIndex < 0 || t.visibleIndex >= vp.length) return; const x = getX(t.visibleIndex), y = getY(vp[t.visibleIndex]); ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fillStyle = t.type === 'buy' ? '#22C55E' : '#EF4444'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t.type === 'buy' ? 'B' : 'S', x, y); });
+      // Current price dot
+      if (vp.length > 0) { const li = vp.length - 1; ctx.beginPath(); ctx.arc(getX(li), getY(vp[li]), 6, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2; ctx.stroke(); }
+      if (savedSettings.indicators.includes('rsi')) drawRSI();
+    }
+
+    function drawRSI() {
+      const canvas = el.rsiCanvas, rect = el.rsiArea.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
+      const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, rect.width, rect.height);
+      const fp = state.fullPriceHistory, vp = getVisiblePrices(), visibleStartInFull = fp.length - vp.length;
+      const rsi = calcRSI(fp, 14).slice(visibleStartInFull);
+      const getX = i => (i / (VISIBLE_POINTS - 1)) * rect.width, getY = v => ((100 - v) / 100) * rect.height;
+      ctx.fillStyle = 'rgba(239,68,68,0.08)'; ctx.fillRect(0, 0, rect.width, getY(70));
+      ctx.fillStyle = 'rgba(34,197,94,0.08)'; ctx.fillRect(0, getY(30), rect.width, rect.height - getY(30));
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.moveTo(0, getY(70)); ctx.lineTo(rect.width, getY(70)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, getY(30)); ctx.lineTo(rect.width, getY(30)); ctx.stroke();
+      ctx.setLineDash([]); ctx.strokeStyle = '#06B6D4'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      const visibleRsi = rsi.slice(0, vp.length);
+      if (visibleRsi.length > 1) {
+        ctx.moveTo(getX(0), getY(visibleRsi[0]));
+        for (let i = 1; i < visibleRsi.length; i++) {
+          ctx.lineTo(getX(i), getY(visibleRsi[i]));
+        }
+      }
+      ctx.stroke();
+    }
+
+    function calculateBalance() { if (state.position === 'out') state.currentBalance = state.cash; else if (state.position === 'long') state.currentBalance = state.shares * state.currentPrice; else if (state.position === 'short') state.currentBalance = state.cash + (state.entryPrice - state.currentPrice) * state.shares; state.marketBalance = state.initialBalance * (state.currentPrice / state.initialGamePrice); state.maxBalance = Math.max(state.maxBalance, state.currentBalance); state.minBalance = Math.min(state.minBalance, state.currentBalance); if (state.position !== 'out') state.timeInPosition++; }
+    function updateTradesCounter() { const c = state.trades.length, dots = el.tradesDots.children; for (let i = 0; i < 3; i++) { if (i < state.trades.length) { dots[i].className = 'trade-dot filled ' + state.trades[i].type; dots[i].textContent = state.trades[i].type === 'buy' ? 'B' : 'S'; } else { dots[i].className = 'trade-dot'; dots[i].textContent = i + 1; } } el.tradesCounter.classList.toggle('complete', c >= MIN_TRADES); el.tradesStatus.textContent = c >= MIN_TRADES ? '✓' : `мин. ${MIN_TRADES}`; el.tradesStatus.classList.toggle('complete', c >= MIN_TRADES); }
+    function updatePositionStatus() { const pos = state.position; el.positionStatus.className = 'position-status ' + pos; el.btnBuy.classList.toggle('active', pos === 'long'); el.btnSell.classList.toggle('active', pos === 'short'); el.btnBuy.disabled = pos === 'long'; el.btnSell.disabled = pos === 'short'; if (pos === 'long') { el.positionLabel.textContent = 'Long'; el.positionSublabel.textContent = 'Ставка на рост'; const pnl = ((state.currentPrice - state.entryPrice) / state.entryPrice) * 100; el.positionPnl.textContent = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`; el.positionPnl.className = 'position-pnl ' + (pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : 'neutral'); } else if (pos === 'short') { el.positionLabel.textContent = 'Short'; el.positionSublabel.textContent = 'Ставка на падение'; const pnl = ((state.entryPrice - state.currentPrice) / state.entryPrice) * 100; el.positionPnl.textContent = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`; el.positionPnl.className = 'position-pnl ' + (pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : 'neutral'); } else { el.positionLabel.textContent = 'Out'; el.positionSublabel.textContent = 'Вне позиции'; el.positionPnl.textContent = '—'; el.positionPnl.className = 'position-pnl neutral'; } el.positionPnlLabel.textContent = pos !== 'out' ? 'P&L' : ''; }
+    function updateUI() { calculateBalance(); el.balanceAmount.textContent = '$' + fmt(state.currentBalance); el.balanceAmount.className = 'balance-amount' + (state.currentBalance > state.initialBalance ? ' positive' : state.currentBalance < state.initialBalance ? ' negative' : ' neutral'); el.balancePercent.textContent = state.currentBalance !== state.initialBalance ? fmtPct(state.currentBalance, state.initialBalance) : ''; el.balancePercent.className = 'balance-percent' + (state.currentBalance > state.initialBalance ? ' positive' : state.currentBalance < state.initialBalance ? ' negative' : ''); el.marketBalanceValue.textContent = '$' + fmt(state.marketBalance); el.marketBalanceValue.className = state.marketBalance > state.initialBalance ? 'positive' : state.marketBalance < state.initialBalance ? 'negative' : ''; el.marketPercent.textContent = state.marketBalance !== state.initialBalance ? fmtPct(state.marketBalance, state.initialBalance) : ''; el.marketPercent.className = state.marketBalance > state.initialBalance ? 'positive' : state.marketBalance < state.initialBalance ? 'negative' : ''; el.gameTimer.textContent = fmtTime(state.remainingSeconds); updatePositionStatus(); updateTradesCounter(); el.yAxis.innerHTML = getYTicks().map(t => `<span class="y-tick">${t}</span>`).join(''); drawChart(); }
+    function updatePrice() { if (state.gameEnded || state.isPaused) return; const ret = genReturns(1)[0]; state.currentPrice *= (1 + ret); state.currentIndex++; state.priceHistory.push(state.currentPrice); state.fullPriceHistory.push(state.currentPrice); state.positionHistory.push(state.position); updateUI(); }
+    function resumeGame() { if (state.isPaused) { state.isPaused = false; el.btnPause.classList.remove('paused'); el.btnPause.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'; el.timerContainer.classList.remove('paused'); } }
+    function buy() { if (state.gameEnded) return; resumeGame(); if (state.position === 'out') { state.shares = state.cash / state.currentPrice; state.cash = 0; state.entryPrice = state.currentPrice; state.position = 'long'; state.trades.push({ type: 'buy', price: state.currentPrice, index: state.priceHistory.length - 1 }); } else if (state.position === 'short') { const pnl = (state.entryPrice - state.currentPrice) * state.shares; state.cash = state.cash + pnl; if (pnl > 0) state.profitableTrades++; else state.unprofitableTrades++; state.shares = 0; state.entryPrice = 0; state.position = 'out'; state.trades.push({ type: 'buy', price: state.currentPrice, index: state.priceHistory.length - 1 }); } if (state.positionHistory.length > 0) state.positionHistory[state.positionHistory.length - 1] = state.position; updateUI(); }
+    function sell() { if (state.gameEnded) return; resumeGame(); if (state.position === 'out') { state.shares = state.cash / state.currentPrice; state.entryPrice = state.currentPrice; state.position = 'short'; state.trades.push({ type: 'sell', price: state.currentPrice, index: state.priceHistory.length - 1 }); } else if (state.position === 'long') { state.cash = state.shares * state.currentPrice; const pnl = state.currentPrice - state.entryPrice; if (pnl > 0) state.profitableTrades++; else state.unprofitableTrades++; state.shares = 0; state.entryPrice = 0; state.position = 'out'; state.trades.push({ type: 'sell', price: state.currentPrice, index: state.priceHistory.length - 1 }); } if (state.positionHistory.length > 0) state.positionHistory[state.positionHistory.length - 1] = state.position; updateUI(); }
+    function togglePause() { state.isPaused = !state.isPaused; el.btnPause.classList.toggle('paused', state.isPaused); el.timerContainer.classList.toggle('paused', state.isPaused); el.btnPause.innerHTML = state.isPaused ? '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>' : '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'; }
+    function startGame() { el.onboarding.classList.add('hidden'); el.gameScreen.classList.remove('hidden'); startRound(); }
+    function startRound() { state.fullPriceHistory = [state.initialPrice]; let price = state.initialPrice; const histReturns = genReturns(HISTORY_LENGTH); for (let i = 0; i < HISTORY_LENGTH; i++) { price *= (1 + histReturns[i]); state.fullPriceHistory.push(price); } state.currentPrice = price; state.initialGamePrice = price; state.priceHistory = [price]; state.positionHistory = ['out']; state.trades = []; state.remainingSeconds = state.totalSeconds; state.currentIndex = 0; state.position = 'out'; state.cash = state.initialBalance; state.shares = 0; state.entryPrice = 0; state.currentBalance = state.initialBalance; state.marketBalance = state.initialBalance; state.maxBalance = state.initialBalance; state.minBalance = state.initialBalance; state.timeInPosition = 0; state.profitableTrades = 0; state.unprofitableTrades = 0; state.gameStarted = true; state.gameEnded = false; state.isPaused = false; el.btnPause.classList.remove('paused'); el.btnPause.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'; el.timerContainer.classList.remove('paused'); updateChartLegend(); updateUI(); state.timerInterval = setInterval(() => { if (state.isPaused) return; if (state.remainingSeconds > 0) { state.remainingSeconds--; el.gameTimer.textContent = fmtTime(state.remainingSeconds); } else endRound(); }, 1000); state.priceInterval = setInterval(updatePrice, 500 / savedSettings.speed); }
+    function endRound() { state.gameEnded = true; clearInterval(state.timerInterval); clearInterval(state.priceInterval); if (state.position === 'long') { state.cash = state.shares * state.currentPrice; if (state.currentPrice > state.entryPrice) state.profitableTrades++; else state.unprofitableTrades++; state.shares = 0; } else if (state.position === 'short') { const pnl = (state.entryPrice - state.currentPrice) * state.shares; state.cash = state.cash + pnl; if (pnl > 0) state.profitableTrades++; else state.unprofitableTrades++; state.shares = 0; } state.position = 'out'; calculateBalance(); const hasEnoughTrades = state.trades.length >= MIN_TRADES, roundWon = hasEnoughTrades && state.currentBalance > state.marketBalance; state.roundsPlayed++; if (roundWon) state.roundsWon++; state.roundResults.push(roundWon); showResults(roundWon, hasEnoughTrades); }
+    function showResults(roundWon, hasEnoughTrades) { const isGameOver = state.roundsPlayed >= MAX_ROUNDS || state.roundsWon >= WINS_NEEDED || (state.roundsPlayed - state.roundsWon) > (MAX_ROUNDS - WINS_NEEDED), gameWon = state.roundsWon >= WINS_NEEDED; el.resultModal.classList.toggle('winner', gameWon && isGameOver); el.resultModal.classList.toggle('loser', !gameWon || !isGameOver); if (!hasEnoughTrades) { el.resultIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'; el.resultTitle.textContent = 'Мало сделок!'; } else if (isGameOver && gameWon) { el.resultIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>'; el.resultTitle.textContent = '🎉 Вы выиграли!'; } else if (isGameOver) { el.resultIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="#3B82F6"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5-2 4-2 4 2 4 2" stroke="#1a2744" stroke-width="2" fill="none"/><circle cx="9" cy="9" r="1.5" fill="#1a2744"/><circle cx="15" cy="9" r="1.5" fill="#1a2744"/></svg>'; el.resultTitle.textContent = 'Игра окончена'; } else { el.resultIcon.innerHTML = roundWon ? '<svg viewBox="0 0 24 24" fill="#22C55E"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '<svg viewBox="0 0 24 24" fill="#EF4444"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'; el.resultTitle.textContent = roundWon ? 'Раунд выигран!' : 'Раунд проигран'; } let winsHTML = ''; for (let i = 0; i < MAX_ROUNDS; i++) { if (i < state.roundResults.length) winsHTML += `<span class="win-dot ${state.roundResults[i] ? 'won' : 'lost'}">${state.roundResults[i] ? '✓' : '✕'}</span>`; else winsHTML += `<span class="win-dot">${i + 1}</span>`; } el.winsTracker.innerHTML = winsHTML; el.resultYourBalance.textContent = '$' + fmt(state.currentBalance); el.resultMarketBalance.textContent = '$' + fmt(state.marketBalance); const deviation = ((state.currentBalance - state.marketBalance) / state.marketBalance * 100).toFixed(1); const maxDrawdown = ((state.maxBalance - state.minBalance) / state.maxBalance * 100); const timeInPosPct = ((state.timeInPosition / Math.max(1, state.priceHistory.length)) * 100).toFixed(0); const volatility = calcVolatility().toFixed(2); const ddValue = maxDrawdown > 0 ? `-${maxDrawdown.toFixed(1)}%` : '0%'; const ddClass = maxDrawdown > 0 ? 'negative' : ''; el.statsGrid.innerHTML = `<div class="stat-item"><div class="stat-value">${state.trades.length}</div><div class="stat-label">Сделок</div></div><div class="stat-item"><div class="stat-value ${parseFloat(deviation) >= 0 ? 'positive' : 'negative'}">${deviation}%</div><div class="stat-label">vs Market</div></div><div class="stat-item"><div class="stat-value">${state.profitableTrades}</div><div class="stat-label">Прибыльных</div></div><div class="stat-item"><div class="stat-value ${ddClass}">${ddValue}</div><div class="stat-label">Макс. убыток</div></div><div class="stat-item"><div class="stat-value">${timeInPosPct}%</div><div class="stat-label">Время в позиции</div></div><div class="stat-item"><div class="stat-value">${volatility}%</div><div class="stat-label">Волатильность</div></div>`; el.tipsText.textContent = generateTip(roundWon, hasEnoughTrades); el.btnRetry.textContent = isGameOver ? (gameWon ? '🎁 Забрать приз' : 'Начать заново') : `Раунд ${state.roundsPlayed + 1} из ${MAX_ROUNDS}`; el.resultOverlay.classList.remove('hidden'); }
+    function calcVolatility() { const vp = getVisiblePrices(); if (vp.length < 2) return 0; const returns = []; for (let i = 1; i < vp.length; i++) returns.push((vp[i] - vp[i-1]) / vp[i-1]); const mean = returns.reduce((a, b) => a + b, 0) / returns.length; return Math.sqrt(returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length) * 100; }
+    function generateTip(won, enoughTrades) { if (!enoughTrades) return 'Совершайте минимум 3 сделки за раунд. Активная торговля — ключ к успеху!'; const tips = won ? ['Отличная работа! Вы успешно определили моменты входа и выхода.','Хорошее чувство рынка! Продолжайте анализировать тренды.','Вы обыграли рынок — это непросто!'] : [state.timeInPosition > state.priceHistory.length * 0.8 ? 'Попробуйте чаще фиксировать прибыль вместо долгого удержания позиции.' : 'Иногда лучше дольше оставаться в прибыльной позиции.', state.profitableTrades < state.unprofitableTrades ? 'Старайтесь входить в позицию на локальных минимумах.' : 'Хорошее соотношение сделок, но размер прибыли важнее количества.', state.trades.length > 6 ? 'Меньше сделок, больше анализа. Частая торговля съедает прибыль.' : 'Попробуйте использовать индикаторы для определения тренда.']; return tips[Math.floor(Math.random() * tips.length)]; }
+    function handleRetry() { const isGameOver = state.roundsPlayed >= MAX_ROUNDS || state.roundsWon >= WINS_NEEDED || (state.roundsPlayed - state.roundsWon) > (MAX_ROUNDS - WINS_NEEDED); if (isGameOver) { state.roundsPlayed = 0; state.roundsWon = 0; state.roundResults = []; el.resultOverlay.classList.add('hidden'); el.gameScreen.classList.add('hidden'); el.onboarding.classList.remove('hidden'); state.onboardingStep = 0; updateOnboardingDots(); drawSlideCharts(); } else { el.resultOverlay.classList.add('hidden'); startRound(); } }
+    function reset() { clearInterval(state.timerInterval); clearInterval(state.priceInterval); state.roundsPlayed = 0; state.roundsWon = 0; state.roundResults = []; state.onboardingStep = 0; el.gameScreen.classList.add('hidden'); el.resultOverlay.classList.add('hidden'); el.onboarding.classList.remove('hidden'); updateOnboardingDots(); drawSlideCharts(); }
+
+    el.btnStart.addEventListener('click', startGame);
+    el.btnClose.addEventListener('click', reset);
+    el.btnBuy.addEventListener('click', buy);
+    el.btnSell.addEventListener('click', sell);
+    el.btnPause.addEventListener('click', togglePause);
+    el.btnRetry.addEventListener('click', handleRetry);
+    el.btnSettingsOnboard.addEventListener('click', openSettings);
+    el.btnSettingsSave.addEventListener('click', saveSettings);
+    el.btnSettingsX.addEventListener('click', closeSettingsWithoutSave);
+    document.querySelectorAll('.dot').forEach(d => d.addEventListener('click', () => { state.onboardingStep = +d.dataset.step; updateOnboardingDots(); }));
+    document.querySelectorAll('.speed-btn').forEach(b => b.addEventListener('click', () => { tempSettings.speed = parseInt(b.dataset.speed); updateSettingsUI(); }));
+    document.querySelectorAll('.indicator-btn').forEach(b => b.addEventListener('click', () => { const ind = b.dataset.indicator, idx = tempSettings.indicators.indexOf(ind); if (idx >= 0) tempSettings.indicators.splice(idx, 1); else if (tempSettings.indicators.length < 2) tempSettings.indicators.push(ind); updateSettingsUI(); }));
+    window.addEventListener('resize', () => { if (state.gameStarted && !state.gameEnded) drawChart(); drawSlideCharts(); });
+
+    initOnboarding();
+    updateSettingsUI();
+  </script>
+</body>
+</html>
